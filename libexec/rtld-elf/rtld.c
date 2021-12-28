@@ -244,6 +244,7 @@ int dlclose(void *) __exported;
 char *dlerror(void) __exported;
 void *dlopen(const char *, int) __exported;
 void *fdlopen(int, int) __exported;
+void *dlopen_sandbox(const char *, int) __exported;
 void *dlsym(void *, const char *) __exported;
 dlfunc_t dlfunc(void *, const char *) __exported;
 void *dlvsym(void *, const char *, const char *) __exported;
@@ -3597,6 +3598,24 @@ fdlopen(int fd, int mode)
 {
 
 	return (rtld_dlopen(NULL, fd, mode));
+}
+
+void *
+dlopen_sandbox(const char *name, int mode)
+{
+    Obj_Entry *obj;
+
+    trace();
+
+    obj = dlopen(name, mode);
+    if (obj) {
+        if (obj->dl_refcount > 1) {
+            msg("Not allowed to load sandboxed library multiple times");
+            abort(); // TODO: instead of abort, dlclose()
+        }
+    }
+
+    return obj;
 }
 
 static void *
