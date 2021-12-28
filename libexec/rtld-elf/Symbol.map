@@ -7,6 +7,7 @@ FBSD_1.0 {
     dlclose;
     dlerror;
     dlopen;
+    dlopen_sandbox;
     dlsym;
     dlfunc;
     dlvsym;
