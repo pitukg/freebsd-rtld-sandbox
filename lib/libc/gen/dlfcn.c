@@ -119,6 +119,15 @@ dlopen(const char *name __unused, int mode __unused)
 	return (NULL);
 }
 
+#pragma weak dlopen_sandbox
+void *
+dlopen_sandbox(const char *name __unused, int mode __unused)
+{
+
+	_rtld_error(sorry);
+	return (NULL);
+}
+
 #pragma weak dlsym
 void *
 dlsym(void * __restrict handle __unused, const char * __restrict name __unused)
