@@ -1,7 +1,6 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
- * Copyright 2014 Jonathan Anderson.
- * Copyright 2021 Mariusz Zaborski <oshogbo@vexillium.org>
+ * Copyright 2021 Mariusz Zaborski <oshogbo@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,22 +25,45 @@
  * $FreeBSD$
  */
 
-#ifndef _LD_COMMON_H_
-#define _LD_COMMON_H_
+#include <atf-c.h>
+#include <fcntl.h>
+#include <stdio.h>
 
-#define	TARGET_ELF_NAME	"target"
-#define	TARGET_LIBRARY	"libpythagoras.so.0"
-#define SANDBOX_RTLD_RELPATH    "../ld-elf.so.1"
-#define SANDBOX_TARGET_RELPATH  "dlopen_sandbox_target/dlopen_sandbox_target"
+#include "common.h"
 
-void	expect_success(int binary, char *senv);
-void	expect_missing_library(int binary, char *senv);
-void    expect_sandbox_success(const char *library_dir, char *library_name);
-void    expect_sandbox_fail(const char *library_dir, char *library_name);
+#define LIBHELLOWORLD_DIR   "./libhelloworld"
+#define LIBHELLOWORLD_NAME  "libhelloworld.so.0"
+#define LIBPRINTS_DIR       "./libprints"
+#define LIBPRINTS_NAME      "libprints.so.0"
 
-void	try_to_run(int binary, int expected_exit_status, char * const *env,
-	    const char *expected_out, const char *expected_err);
-int	opendir_fd(const char *name);
-int	opendirat(int parent, const char *name);
+static void
+setup(const atf_tc_t *tc)
+{
+}
 
-#endif /* _LD_COMMON_H_ */
+ATF_TC_WITHOUT_HEAD(libhelloworld_passes);
+ATF_TC_BODY(libhelloworld_passes, tc)
+{
+
+	setup(tc);
+	expect_sandbox_success(LIBHELLOWORLD_DIR, LIBHELLOWORLD_NAME);
+}
+
+ATF_TC_WITHOUT_HEAD(libprints_fails);
+ATF_TC_BODY(libprints_fails, tc)
+{
+
+    setup(tc);
+    expect_sandbox_fail(LIBPRINTS_DIR, LIBPRINTS_NAME);
+}
+
+
+/* Register test cases with ATF. */
+ATF_TP_ADD_TCS(tp)
+{
+
+	ATF_TP_ADD_TC(tp, libhelloworld_passes);
+    ATF_TP_ADD_TC(tp, libprints_fails);
+
+	return atf_no_error();
+}

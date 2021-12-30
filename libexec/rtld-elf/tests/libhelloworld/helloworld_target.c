@@ -1,7 +1,6 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  * Copyright 2014 Jonathan Anderson.
- * Copyright 2021 Mariusz Zaborski <oshogbo@vexillium.org>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,22 +25,14 @@
  * $FreeBSD$
  */
 
-#ifndef _LD_COMMON_H_
-#define _LD_COMMON_H_
+#include <dlfcn.h>
 
-#define	TARGET_ELF_NAME	"target"
-#define	TARGET_LIBRARY	"libpythagoras.so.0"
-#define SANDBOX_RTLD_RELPATH    "../ld-elf.so.1"
-#define SANDBOX_TARGET_RELPATH  "dlopen_sandbox_target/dlopen_sandbox_target"
+extern void *dlopen_sandbox(const char *name, int mode);
 
-void	expect_success(int binary, char *senv);
-void	expect_missing_library(int binary, char *senv);
-void    expect_sandbox_success(const char *library_dir, char *library_name);
-void    expect_sandbox_fail(const char *library_dir, char *library_name);
 
-void	try_to_run(int binary, int expected_exit_status, char * const *env,
-	    const char *expected_out, const char *expected_err);
-int	opendir_fd(const char *name);
-int	opendirat(int parent, const char *name);
+int main(void)
+{
+    void *obj = dlopen_sandbox("libhelloworld.so.0", RTLD_NOW);
 
-#endif /* _LD_COMMON_H_ */
+    return (obj == NULL);
+}
