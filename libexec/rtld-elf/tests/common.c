@@ -51,6 +51,33 @@ expect_missing_library(int binary, char *senv)
 }
 
 void
+expect_sandbox_success(const char *library_dir, char *library_name)
+{
+    char ld_library_path_var_buffer[128] = {"LD_LIBRARY_PATH="};
+    strncat(ld_library_path_var_buffer, library_dir, 100UL);
+    char * const env[] = { ld_library_path_var_buffer, SANDBOX_RTLD_RELPATH,
+                           SANDBOX_TARGET_RELPATH, library_name, NULL };
+
+    int envfd = open("/usr/bin/env", O_RDONLY);
+
+    try_to_run(envfd, 0, env, "Success.\n", "");
+}
+
+void
+expect_sandbox_fail(const char *library_dir, char *library_name)
+{
+    char ld_library_path_var_buffer[128] = {"LD_LIBRARY_PATH="};
+    strncat(ld_library_path_var_buffer, library_dir, 100UL);
+    char * const env[] = { ld_library_path_var_buffer, SANDBOX_RTLD_RELPATH,
+                           SANDBOX_TARGET_RELPATH, library_name, NULL };
+
+    int envfd = open("/usr/bin/env", O_RDONLY);
+
+    try_to_run(envfd, 2, env, "", "Failed.\n");
+}
+
+
+void
 try_to_run(int binary, int exit_status, char * const *env,
         const char *expected_out, const char *expected_err)
 {
