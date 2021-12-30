@@ -119,6 +119,7 @@ __BEGIN_DECLS
 int	 dlclose(void *);
 char	*dlerror(void);
 void	*dlopen(const char *, int);
+void	*dlopen_sandbox(const char *, int);
 void	*dlsym(void * __restrict, const char * __restrict);
 
 #if __BSD_VISIBLE
