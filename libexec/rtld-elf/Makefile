@@ -29,6 +29,7 @@ SRCS= \
 	rtld_lock.c \
 	rtld_malloc.c \
 	rtld_printf.c \
+	rtld_sandbox.c \
 	map_object.c \
 	xmalloc.c \
 	debug.c \
