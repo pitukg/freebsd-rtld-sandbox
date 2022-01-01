@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include "rtld_tls.h"
 #include "rtld_printf.h"
 #include "rtld_malloc.h"
+#include "rtld_sandbox.h"
 #include "rtld_utrace.h"
 #include "notes.h"
 #include "rtld_libc.h"
@@ -3703,6 +3704,22 @@ dlopen_sandbox(const char *name, int mode)
             msg("Not allowed to load sandboxed library multiple times");
             abort(); // TODO: instead of abort, dlclose()
         }
+
+
+        for (unsigned int symoffset = 0U; symoffset < obj->dynsymcount; ++symoffset) {
+            const Elf_Sym *symbol = obj->symtab + symoffset;
+            const char *symname = obj->strtab + symbol->st_name;
+            unsigned char bind = ELF_ST_BIND(symbol->st_info);
+            unsigned char type = ELF_ST_TYPE(symbol->st_info);
+            if (type != STT_NOTYPE &&
+                symbol->st_shndx == SHN_UNDEF &&
+                !check_symbol_allowed_in_sandbox(symname, type)) {
+                dlclose(obj);
+                return (NULL);
+            }
+            dbg("dynsym: %s\tbind=%d\ttype=%d\n", symname, bind, type);
+        }
+
     }
 
     return obj;
