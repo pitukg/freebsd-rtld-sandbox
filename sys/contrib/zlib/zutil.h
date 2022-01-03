@@ -221,6 +221,7 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 #  define HAVE_MEMCPY
 #endif
 #ifdef HAVE_MEMCPY
+#  include <string.h>
 #  ifdef SMALL_MEDIUM /* MSDOS small or medium model */
 #    define zmemcpy _fmemcpy
 #    define zmemcmp _fmemcmp
@@ -257,9 +258,26 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 #endif
 
 #if !defined(Z_SOLO) || defined(_KERNEL)
-   voidpf ZLIB_INTERNAL zcalloc OF((voidpf opaque, unsigned items,
-                                    unsigned size));
-   void ZLIB_INTERNAL zcfree  OF((voidpf opaque, voidpf ptr));
+#  ifdef Z_STDLIB_MALLOC_FREE
+     /* Force that functions are in the the same compilation unit. */
+#    include <stdlib.h>
+     static voidpf ZLIB_INTERNAL zcalloc OF((voidpf opaque, unsigned items,
+                                        unsigned size))
+     {
+         (void)opaque;
+         return calloc(items, size);
+     }
+
+     static void ZLIB_INTERNAL zcfree OF((voidpf opaque, voidpf ptr))
+     {
+         (void)opaque;
+         free(ptr);
+     }
+#  else
+     voidpf ZLIB_INTERNAL zcalloc OF((voidpf opaque, unsigned items,
+                                        unsigned size));
+     void ZLIB_INTERNAL zcfree  OF((voidpf opaque, voidpf ptr));
+#  endif
 #endif
 
 #define ZALLOC(strm, items, size) \
