@@ -53,7 +53,10 @@ static const AllowedSymbol allowed_symbols[] = {
                                                calling (C++) dtors */
         {"_Jv_RegisterClasses", STT_FUNC},  /* Weak symbol defined in libc
                                                for GNU Java compiler */
+	{"__stack_chk_fail", STT_FUNC},
+	{"__stack_chk_guard", STT_OBJECT},
         {"malloc", STT_FUNC},
+	{"calloc", STT_FUNC},
         {"free", STT_FUNC},
         {"memcpy", STT_FUNC},
         {"memset", STT_FUNC},

@@ -1,8 +1,8 @@
 # $FreeBSD$
 
-SUBDIR+=	libhelloworld libprints libpythagoras target dlopen_sandbox_target
+SUBDIR+=	libhelloworld libprints libglobvar libpythagoras target dlopen_sandbox_target
 
-SUBDIR_DEPEND_target=	libhelloworld libprints libpythagoras
+SUBDIR_DEPEND_target=	libhelloworld libprints libglobvar libpythagoras
 
 ATF_TESTS_C=	ld_library_pathfds
 ATF_TESTS_C+=	ld_preload_fds

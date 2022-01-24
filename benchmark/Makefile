@@ -13,7 +13,7 @@ benchmark-dlopen_sandbox.o: dlopen-benchmark.c
 	cc -c -o $(BUILDDIR)/${.TARGET} ${CFLAGS} -DBENCHMARK_DLOPEN_SANDBOX dlopen-benchmark.c -dynamic
 
 benchmark-dlopen: benchmark-dlopen.o
-	c++ -o $(BUILDDIR)/${.TARGET} $(BUILDDIR)/${.ALLSRC} -lpmc -dynamic -lxo -lutil
+	c++ -o $(BUILDDIR)/${.TARGET} $(BUILDDIR)/${.ALLSRC} $(SYSROOT)/lib/libc.so.7 -lpmc -dynamic -lxo -lutil
 
 benchmark-dlopen_sandbox: benchmark-dlopen_sandbox.o
 	c++ -o $(BUILDDIR)/${.TARGET} $(BUILDDIR)/${.ALLSRC} $(SYSROOT)/lib/libc.so.7 -lpmc -dynamic -lxo -lutil

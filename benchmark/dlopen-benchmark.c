@@ -14,138 +14,172 @@
 #include <sysexits.h>
 #endif
 
-//#ifndef MODIFIED_SYSROOT
-//void *dlopen_sandbox(const char *name, int mode);
-//#endif
-//
-//typedef void *(*dlopen_fptr)(const char *, int);
-
 #if defined(BENCHMARK_DLOPEN)
-#define DLOPEN  dlopen
+#define DLOPEN dlopen
 #elif defined(BENCHMARK_DLOPEN_SANDBOX)
-#define DLOPEN  dlopen_sandbox
+#define DLOPEN dlopen_sandbox
 #else
-#define DLOPEN  fail, one of the above symbols need to be defined
+#define DLOPEN fail, one of the above symbols need to be defined
 #endif
 
 #ifndef DLOPEN_MODE
 #define DLOPEN_MODE RTLD_NOW
 #endif
 
-#define NO_OUTER_ITERATIONS (10U)
-#define NO_INNER_ITERATIONS (10U)
-
-#define NUM_TEST_LIBRARIES  (2U)
-const char *test_library_absolute_paths[] =  {
-        TEST_LIBRARIES_ROOT "/libhelloworld/libhelloworld.so.0",
-        NULL,
-        TEST_LIBRARIES_ROOT "/libprints/libprints.so.0",
-        NULL
+#define NUM_COUNTERS (3U)
+static const char *counter_set[] = {
+	"branches",
+	"branch-mispredicts",
+	"unhalted-cycles"
 };
 
-unsigned long cycle_counts[NUM_TEST_LIBRARIES][NO_OUTER_ITERATIONS];
+#define NO_OUTER_ITERATIONS (1000U)
+#define NO_INNER_ITERATIONS (100U)
+
+#define NUM_TEST_LIBRARIES (3U)
+static const char *test_library_absolute_paths[] = {
+	TEST_LIBRARIES_ROOT "/libhelloworld/libhelloworld.so.0",
+	TEST_LIBRARIES_ROOT "/libglobvar/libglobvar.so.0",
+	"/home/gp472/ld-exploration/obj/home/gp472/ld-exploration/freebsd-src/amd64.amd64/lib/libz_nofio/libz_nofio.so.6",
+	TEST_LIBRARIES_ROOT "/libprints/libprints.so.0", /* Doesn't pass sandbox policy */
+	NULL
+};
+
+static pmc_id_t pmcids[NUM_COUNTERS];
+static unsigned long pmc_values[NUM_TEST_LIBRARIES][NUM_COUNTERS][NO_OUTER_ITERATIONS];
+
+static void
+pmc_setup_run(void)
+{
+	for (int counter_index = 0; counter_index < NUM_COUNTERS; ++counter_index) {
+		if (pmc_allocate(counter_set[counter_index], PMC_MODE_TC, 0, PMC_CPU_ANY, &pmcids[counter_index], 64 * 1024) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_allocate (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+		if (pmc_attach(pmcids[counter_index], 0) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_attach (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+		if (pmc_write(pmcids[counter_index], 0) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_write (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+	}
+}
+
+static void
+pmc_teardown_run(void)
+{
+	for (int counter_index = 0; counter_index < NUM_COUNTERS; ++counter_index) {
+		if (pmc_detach(pmcids[counter_index], 0) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_detach (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+		if (pmc_release(pmcids[counter_index]) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_release (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+	}
+}
+
+static __inline void
+pmc_begin(void)
+{
+	for (int counter_index = 0; counter_index < NUM_COUNTERS; ++counter_index) {
+		if (pmc_start(pmcids[counter_index]) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_start (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+	}
+}
+
+static __inline void
+pmc_end(void)
+{
+	for (int counter_index = 0; counter_index < NUM_COUNTERS; ++counter_index) {
+		if (pmc_stop(pmcids[counter_index]) < 0) {
+			xo_err(EX_OSERR, "FAIL: pmc_stop (%s) for %s", strerror(errno), counter_set[counter_index]);
+		}
+	}
+}
 
 
-int main(int argc, char *argv[]) {
-    pmc_id_t pmcid;
+int
+main(int argc, char *argv[])
+{
+	/* Initialise PMC library */
+	pmc_init();
 
-    /* Initialise PMC library */
-    pmc_init();
+	/* Run dlopen-dlclose benchmark in a loop on the set of test libraries */
+	for (int testlib_no = 0; testlib_no < NUM_TEST_LIBRARIES; ++testlib_no) {
 
-    /* Allocate a PMC counter for the CPU cycles */
-    if (pmc_allocate("unhalted-cycles", PMC_MODE_TC, 0, PMC_CPU_ANY, &pmcid, 64*1024) < 0) {
-        xo_err(EX_OSERR, "FAIL: pmc_allocate cycles (%s)", strerror(errno));
-        return 1;
-    }
+		for (int outer_it_no = 0; outer_it_no < NO_OUTER_ITERATIONS; ++outer_it_no) {
 
-    /* Attach PMC counter to current process */
-    if (pmc_attach(pmcid, 0) < 0) {
-        xo_err(EX_OSERR, "FAIL: pmc_attach cycles (%s)", strerror(errno));
-        return 2;
-    }
+			/* Assert object is closed */
+			if (NULL != DLOPEN(test_library_absolute_paths[testlib_no], RTLD_NOLOAD)) {
+				fprintf(stderr, "Assert failed, object not closed between iterations\n");
+			}
 
-    /* Start the PMC counter */
-    if (pmc_start(pmcid) < 0) {
-        xo_err(EX_OSERR, "FAIL: pmc_start cycles (%s)", strerror(errno));
-        return 3;
-    }
+			/* Attach and start counters */
+			pmc_setup_run();
+			pmc_begin();
 
+			for (int inner_it_no = 0; inner_it_no < NO_INNER_ITERATIONS; ++inner_it_no) {
+				void *handle = DLOPEN(test_library_absolute_paths[testlib_no], DLOPEN_MODE);
 
-    /* Run dlopen-dlclose benchmark in a loop on the set of test libraries */
-    for (int testlib_no = 0; NULL != test_library_absolute_paths[testlib_no]; ++testlib_no) {
+				if (NULL == handle) {
+					xo_err(EX_OSERR, "FAIL: dlopen (%s)", dlerror());
+				}
 
-        for (int outer_it_no = 0; outer_it_no < NO_OUTER_ITERATIONS; ++outer_it_no) {
+				if (dlclose(handle) < 0) {
+					xo_err(EX_OSERR, "FAIL: dlclose (%s)", dlerror());
+				}
+			}
 
-            unsigned long cnt_prev_val;
-            if (pmc_read(pmcid, &cnt_prev_val) < 0) {
-                xo_err(EX_OSERR, "FAIL: pmc_read (%s)", strerror(errno));
-                return 4;
-            }
+			for (int counter_index = 0; counter_index < NUM_COUNTERS; ++counter_index) {
+				if (pmc_read(pmcids[counter_index], &pmc_values[testlib_no][counter_index][outer_it_no]) < 0) {
+					xo_err(EX_OSERR, "FAIL: pmc_read (%s) for %s", strerror(errno), counter_set[counter_index]);
+				}
+			}
 
-            for (int inner_it_no = 0; inner_it_no < NO_INNER_ITERATIONS; ++inner_it_no) {
-                void *handle = DLOPEN(test_library_absolute_paths[testlib_no], DLOPEN_MODE);
+			/* Detach counters */
+			pmc_end();
+			pmc_teardown_run();
+		}
+	}
 
-                if (NULL == handle) {
-                    xo_err(EX_OSERR, "FAIL: dlopen (%s)", dlerror());
-                    return 5;
-                }
-
-                if (dlclose(handle) < 0) {
-                    xo_err(EX_OSERR, "FAIL: dlclose (%s)", dlerror());
-                    return 6;
-                }
-            }
-
-            unsigned long cnt_curr_val;
-            if (pmc_read(pmcid, &cnt_curr_val) < 0) {
-                xo_err(EX_OSERR, "FAIL: pmc_read (%s)", strerror(errno));
-                return 7;
-            }
-
-            cycle_counts[testlib_no][outer_it_no] = cnt_curr_val - cnt_prev_val;
-
-            /* Assert object is closed */
-            if (NULL != DLOPEN(test_library_absolute_paths[testlib_no], RTLD_NOLOAD)) {
-                fprintf(stderr, "Assert failed, object not closed between iterations\n");
-            }
-        }
-
-    }
-
-    /* End of benchmark */
-    /* Stop the PMC counter */
-    if (pmc_stop(pmcid) < 0) {
-        xo_err(EX_OSERR, "FAIL: pmc_stop (%s)", strerror(errno));
-        return 8;
-    }
-
-    /* Print results */
-    xo_parse_args(argc, argv);
+	/* End of benchmark */
+	/* Print results */
+	xo_parse_args(argc, argv);
 #ifdef BENCHMARK_DLOPEN
-    xo_open_container("dlopen-dlclose");
+	xo_open_container("dlopen-dlclose");
 #else
-    xo_open_container("dlopen_sandbox-dlclose");
+	xo_open_container("dlopen_sandbox-dlclose");
 #endif
 
-    xo_open_list("libraries");
-    for (int libno = 0; libno < NUM_TEST_LIBRARIES; ++libno) {
-        xo_open_instance("libraries");
-        xo_emit("{Lwc:Library path}{:library-path/%s}\n", test_library_absolute_paths[libno]);
-        for (int i = 0; i < NO_OUTER_ITERATIONS; ++i) {
-            xo_emit("{Lwc:Unhalted cycles}{l:unhalted-cycles/%U}\n", cycle_counts[libno][i]);
-        }
-        xo_close_instance("libraries");
-    }
-    xo_close_list("libraries");
+	xo_emit("{Lwc:Outer iterations}{:outer-iterations/%u}", NO_OUTER_ITERATIONS);
+	xo_emit("{Lwc:Inner iterations}{:inner-iterations/%u}", NO_INNER_ITERATIONS);
+
+	xo_open_list("libraries");
+	for (int libno = 0; libno < NUM_TEST_LIBRARIES; ++libno) {
+		xo_open_instance("libraries");
+		xo_emit("{Lwc:Library path}{:library-path/%s}\n", test_library_absolute_paths[libno]);
+		for (int counter_index = 0; counter_index < NUM_COUNTERS; ++counter_index) {
+			xo_open_list(counter_set[counter_index]);
+			for (int i = 0; i < NO_OUTER_ITERATIONS; ++i) {
+				const char *const fmt = "{Lwc:%s}{l:%s/%cU}\n";
+				char fmt_buf[50];
+				sprintf(fmt_buf, fmt, counter_set[counter_index], counter_set[counter_index], '%');
+				xo_emit(fmt_buf, pmc_values[libno][counter_index][i]);
+			}
+			xo_close_list(counter_set[counter_index]);
+		}
+		xo_close_instance("libraries");
+	}
+	xo_close_list("libraries");
 
 #ifdef BENCHMARK_DLOPEN
-    xo_close_container("dlopen-dlclose");
+	xo_close_container("dlopen-dlclose");
 #else
-    xo_close_container("dlopen_sandbox-dlclose");
+	xo_close_container("dlopen_sandbox-dlclose");
 #endif
 
-    /* Finish writing out data */
-    xo_finish();
+	/* Finish writing out data */
+	xo_finish();
 
-    return 0;
+	return 0;
 }

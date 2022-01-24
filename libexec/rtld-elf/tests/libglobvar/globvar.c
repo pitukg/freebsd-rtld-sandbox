@@ -25,14 +25,6 @@
  * $FreeBSD$
  */
 
-#include <dlfcn.h>
+#include "globvar.h"
 
-extern void *dlopen_sandbox(const char *name, int mode);
-
-
-int main(void)
-{
-    void *obj = dlopen_sandbox("libhelloworld.so.0", RTLD_NOW);
-
-    return (obj == NULL);
-}
+int magic_number_global_variable = 29934;
