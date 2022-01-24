@@ -29,3 +29,5 @@ compile_commands.json
 .clangd
 .ccls-cache
 tmux*
+.idea
+benchmark/evaluation/.ipynb_checkpoints
